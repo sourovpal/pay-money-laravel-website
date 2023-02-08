@@ -1,0 +1,93 @@
+{
+    "name": "laravel/laravel",
+    "type": "project",
+    "description": "The Laravel Framework.",
+    "keywords": [
+        "framework",
+        "laravel"
+    ],
+    "license": "MIT",
+    "require": {
+        "php": "^7.3|^8.0",
+        "bacon/bacon-qr-code": "^2.0",
+        "block_io-php/block_io-php": "^3.0",
+        "buzz/laravel-google-captcha": "^2.3",
+        "fideloper/proxy": "^4.4",
+        "fruitcake/laravel-cors": "^2.0",
+        "guzzlehttp/guzzle": "^7.0.1",
+        "hassankhan/config": "^2.2",
+        "intervention/image": "^2.5",
+        "laravel/breeze": "^1.1",
+        "laravel/framework": "8.*",
+        "laravel/passport": "*",
+        "laravel/tinker": "^2.5",
+        "maatwebsite/excel": "^3.1",
+        "mpdf/mpdf": "^8.0",
+        "nwidart/laravel-modules": "8.2.*",
+        "phpmailer/phpmailer": "^6.5",
+        "pragmarx/google2fa-laravel": "^1.4",
+        "stripe/stripe-php": "^7.83",
+        "symfony/yaml": "5.1.x-dev",
+        "twilio/sdk": "^6.19",
+        "yajra/laravel-datatables": "^1.5"
+    },
+    "require-dev": {
+        "facade/ignition": "^2.5",
+        "fakerphp/faker": "^1.9.1",
+        "laravel/sail": "^1.0.1",
+        "mockery/mockery": "^1.4.2",
+        "nunomaduro/collision": "^5.0",
+        "phpunit/phpunit": "^9.3.3"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/",
+            "Modules\\": "Modules/"
+        },
+        "files": [
+            "app/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/",
+            "TechVill\\Theme\\": "packages/TechVill/Theme/src/",
+            "Infoamin\\Installer\\": "packages/infoamin/laravel-installer/src"
+        },
+        "files": [
+            "packages/infoamin/laravel-installer/src/helpers.php"
+        ]
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi"
+        ]
+    },
+    "repositories": [
+        {
+            "type": "git",
+            "url": "https://github.com/doersf/bitcoin-php.git"
+        }
+    ]
+}

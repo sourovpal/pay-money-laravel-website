@@ -1,0 +1,289 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use Validator, Session, Auth, DB, Config, Common, Exception;
+use App\Http\Controllers\Users\EmailController;
+use App\DataTables\Admin\DisputesDataTable;
+use App\Http\Controllers\Controller;
+use App\Rules\CheckValidFile;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use App\Models\{Dispute,
+    DisputeDiscussion,
+    EmailTemplate,
+    Transaction,
+    Reason
+};
+
+class DisputeController extends Controller
+{
+    protected $helper;
+    protected $email;
+    protected $dispute;
+
+    public function __construct()
+    {
+        $this->helper  = new Common();
+        $this->email   = new EmailController();
+        $this->dispute = new Dispute();
+    }
+
+    public function index(DisputesDataTable $dataTable)
+    {
+        $data['menu']     = 'dispute';
+        $data['sub_menu'] = 'dispute';
+
+        $data['summary'] = Dispute::select('id', 'status')->addSelect(DB::raw('COUNT(status) as total_status'))->groupBy('status')->get();
+        $data['dispute_status'] = $this->dispute->select('status')->groupBy('status')->get();
+        $data['dispute_list'] = Dispute::orderBy('id', 'desc')->get();
+
+        $data['from'] = isset(request()->from) ? setDateForDb(request()->from) : null;
+        $data['to'] = isset(request()->to ) ? setDateForDb(request()->to) : null;
+        $data['status'] = isset(request()->status) ? request()->status : 'all';
+        $data['user'] = $user = isset(request()->user_id) ? request()->user_id : null;
+        $data['getName'] = $this->dispute->getDisputesUsersName($user);
+
+        return $dataTable->render('admin.dispute.list', $data);
+    }
+
+    public function disputesUserSearch(Request $request)
+    {
+        $search = $request->search;
+        $users  = $this->dispute->getDisputesUsersResponse($search);
+
+        $res = [
+            'status' => 'fail',
+        ];
+        if (count($users) > 0)
+        {
+            $i = 0;
+
+            foreach ($users as $key => $value)
+            {
+                $array[$i]['id']         = $value->id;
+                $array[$i]['first_name'] = $value->first_name;
+                $array[$i]['last_name']  = $value->last_name;
+                $i++;
+            }
+            $res = [
+                'status' => 'success',
+                'data'   => $array,
+            ];
+        }
+        return json_encode($res);
+    }
+
+    public function add($id)
+    {
+        $data['menu']        = 'dispute';
+        $data['sub_menu']    = 'dispute';
+        $data['transaction'] = Transaction::find($id);
+        $data['reasons'] = Reason::all();
+
+        return view('admin.dispute.add', $data);
+    }
+
+    public function store(Request $request)
+    {
+        $rules = array(
+            'title'       => 'required',
+            'description' => 'required',
+        );
+
+        $fieldNames = array(
+            'title'       => 'Title',
+            'description' => 'Description',
+        );
+
+        $validator = Validator::make($request->all(), $rules);
+        $validator->setAttributeNames($fieldNames);
+
+        if ($validator->fails())
+        {
+            return back()->withErrors($validator)->withInput();
+        }
+        else
+        {
+            $dispute                 = new Dispute();
+            $dispute->claimant_id    = $request->claimant_id;
+            $dispute->defendant_id   = $request->defendant_id;
+            $dispute->transaction_id = $request->transaction_id;
+            $dispute->reason_id      = $request->reason_id;
+            $dispute->title          = $request->title;
+            $dispute->description    = $request->description;
+            $dispute->code           = 'DIS-' . strtoupper(Str::random(6));
+            $dispute->save();
+            $this->helper->one_time_message('success', __('The :x has been successfully saved.', ['x' => __('dispute')])
+        );
+            return redirect(Config::get('adminPrefix').'/disputes');
+        }
+    }
+
+    public function discussion($id)
+    {
+        $data['menu'] = 'dispute';
+        $data['sub_menu'] = 'dispute';
+        $data['dispute'] = Dispute::find($id);
+
+        return view('admin.dispute.discussion', $data);
+    }
+
+    public function storeReply(Request $request)
+    {
+        $rules = array(
+            'description' => 'required',
+            'file' => [new CheckValidFile(getFileExtensions(1), true)],
+        );
+
+        $fieldNames = array(
+            'description' => 'Message',
+            'file'        => __('File'),
+        );
+
+        $validator = Validator::make($request->all(), $rules);
+        $validator->setAttributeNames($fieldNames);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        } else {
+            $file = $request->file('file');
+
+            if (isset($file)) {
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $file_extn = strtolower($file->getClientOriginalExtension());
+                
+                $path = 'uploads\files';
+                $destinationPath = public_path($path);
+
+                try {
+                    $file->move($destinationPath, $fileName);
+                } catch (Exception $e) {
+                    $this->helper->one_time_message('error', $e->getMessage());
+                    return redirect()->back();
+                }
+            }
+
+            $discussion             = new DisputeDiscussion();
+            $discussion->user_id    = Auth::guard('admin')->user()->id;
+            $discussion->message    = $request->description;
+            $discussion->dispute_id = $request->dispute_id;
+            $discussion->file       = isset($fileName) ? $fileName : null;
+            $discussion->type       = 'Admin';
+            $discussion->save();
+
+            /*
+            Mail to both claimant and defandant when admin replying a dispute
+             */
+
+            //if other language's subject and body not set, get en sub and body for mail
+            $englishSenderLanginfo = EmailTemplate::where(['temp_id' => 13, 'lang' => 'en', 'type' => 'email'])->select('subject', 'body')->first();
+
+            $dispute_reply_info = EmailTemplate::where([
+                'temp_id'     => 13,
+                'language_id' => Session::get('default_language'),
+                'type'        => 'email',
+            ])->select('subject', 'body')->first();
+
+            /**
+             * Sms to both claimant and defandant when admin replying a dispute
+             */
+            if (isset($discussion->dispute->claimant_id))
+            {
+                // Mail to claimant
+                if (!empty($dispute_reply_info->subject) && !empty($dispute_reply_info->body))
+                {
+                    $dispute_reply_sub = $dispute_reply_info->subject;
+                    $dispute_reply_msg = str_replace('{user}', $discussion->dispute->claimant->first_name . ' ' . $discussion->dispute->claimant->last_name, $dispute_reply_info->body);
+                }
+                else
+                {
+                    $dispute_reply_sub = $englishSenderLanginfo->subject;
+                    $dispute_reply_msg = str_replace('{user}', $discussion->dispute->claimant->first_name . ' ' . $discussion->dispute->claimant->last_name, $englishSenderLanginfo->body);
+                }
+                $dispute_reply_msg = str_replace('{created_at}', dateFormat(now()), $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{Claimant/Defendant:}', 'Defendant:', $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{claimant/defendant}', $discussion->dispute->defendant->first_name . ' ' . $discussion->dispute->defendant->last_name, $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{transaction_id}', isset($discussion->dispute->transaction) ? $discussion->dispute->transaction->uuid : "Not Available", $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{subject}', $discussion->dispute->title, $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{message}', $discussion->message, $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{status}', $discussion->dispute->status, $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{soft_name}', settings('name'), $dispute_reply_msg);
+
+                if (isset($file))
+                {
+                    if (checkAppMailEnvironment())
+                    {
+                        $this->email->sendEmailWithAttachment($discussion->dispute->claimant->email, $dispute_reply_sub, $dispute_reply_msg, $path, $discussion->file);
+                    }
+                }
+                else
+                {
+                    if (checkAppMailEnvironment())
+                    {
+                        $this->email->sendEmail($discussion->dispute->claimant->email, $dispute_reply_sub, $dispute_reply_msg);
+                    }
+                }
+
+            }
+
+            if (isset($discussion->dispute->defendant_id))
+            {
+                // Mail to defendant
+                if (!empty($dispute_reply_info->subject) && !empty($dispute_reply_info->body))
+                {
+                    $dispute_reply_sub = $dispute_reply_info->subject;
+                    $dispute_reply_msg = str_replace('{user}', $discussion->dispute->defendant->first_name . ' ' . $discussion->dispute->defendant->last_name, $dispute_reply_info->body); //
+                }
+                else
+                {
+                    $dispute_reply_sub = $englishSenderLanginfo->subject;
+                    $dispute_reply_msg = str_replace('{user}', $discussion->dispute->defendant->first_name . ' ' . $discussion->dispute->defendant->last_name, $englishSenderLanginfo->body); //
+                }
+                $dispute_reply_msg = str_replace('{created_at}', dateFormat(now()), $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{Claimant/Defendant:}', 'Claimant:', $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{claimant/defendant}', $discussion->dispute->claimant->first_name . ' ' . $discussion->dispute->claimant->last_name, $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{transaction_id}', isset($discussion->dispute->transaction) ? $discussion->dispute->transaction->uuid : "Not Available", $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{subject}', $discussion->dispute->title, $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{message}', $discussion->message, $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{status}', $discussion->dispute->status, $dispute_reply_msg);
+                $dispute_reply_msg = str_replace('{soft_name}', settings('name'), $dispute_reply_msg);
+
+                if (isset($file))
+                {
+                    if (checkAppMailEnvironment())
+                    {
+                        $this->email->sendEmailWithAttachment($discussion->dispute->defendant->email, $dispute_reply_sub, $dispute_reply_msg, $path, $discussion->file);
+                    }
+                }
+                else
+                {
+                    if (checkAppMailEnvironment())
+                    {
+                        $this->email->sendEmail($discussion->dispute->defendant->email, $dispute_reply_sub, $dispute_reply_msg);
+                    }
+                }
+            }
+            $this->helper->one_time_message('success', __('The :x has been successfully saved.', ['x' => __('dispute reply')])
+        );
+            return redirect(Config::get('adminPrefix').'/dispute/discussion/'. $discussion->dispute->id);
+        }
+    }
+
+    public function changeReplyStatus(Request $request)
+    {
+        $dispute         = Dispute::find($request->id);
+        $dispute->status = $request->status;
+        $dispute->save();
+
+        $data['status'] = 1;
+
+        return json_encode($data);
+    }
+
+    public function download($file_name)
+    {
+        $file_path = public_path('/uploads/files/' . $file_name);
+        return response()->download($file_path);
+    }
+}

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<title>{{ __('Print') }}</title>
+</head>
+    <style>
+	   body{ font-family: 'Lato', sans-serif; color:#121212;}
+
+	   hr { border-top:1px solid #f0f0f0;}
+	   table { border-collapse:collapse;}
+	   .code td{ padding:5px;}
+
+	</style>
+	<body>
+	    <div style="width:900px; margin:auto; top:20px; position:relative;">
+			<table style="margin-bottom:40px;">
+				<tr>
+				 <td>
+					{!! getSystemLogo() !!}
+				 </td>
+				</tr>
+			</table>
+
+			@if ($transaction->transaction_type_id == Exchange_From)
+				<table>
+				    <tr>
+					  <td>
+					   <table>
+						  <tr>
+							<td style="font-size:16px; color:#000000; line-height:25px; font-weight:bold;">@lang('message.dashboard.left-table.exchange-from.from-wallet')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#4e5c6e; line-height:22px;">{{$transaction->currency->code}}</td>
+						  </tr>
+						  </table>
+					  </td>
+					  </tr>
+
+					<tr>
+					  <td>
+					   <table style="margin-top:20px;">
+						  <tr>
+							<td style="font-size:16px; color:#000000; line-height:25px; font-weight:bold;">@lang('message.dashboard.left-table.transaction-id')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#4e5c6e; line-height:22px;">{{$transaction->uuid}}</td>
+						  </tr>
+						  <br><br>
+
+						  <tr>
+							<td style="font-size:16px; color:#000000; line-height:25px; font-weight:bold;">@lang('message.dashboard.left-table.transaction-date')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#4e5c6e; line-height:22px;">{{ dateFormat($transaction->created_at) }}</td>
+						  </tr>
+						  <br><br>
+
+						  <tr>
+							<td style="font-size:16px; color:#000000; line-height:25px; font-weight:bold;">@lang('message.form.status')</td>
+						  </tr>
+						  <tr>
+						  	<td style="font-size:15px; color:#4e5c6e; line-height:22px;">{{ (($transaction->status == 'Blocked') ? __("Cancelled") :(($transaction->status == 'Refund') ? __("Refunded"):
+								__($transaction->status))) }}</td>
+						  </tr>
+					   </table>
+					  </td>
+					  </tr>
+
+					<tr>
+					  <td>
+					   <table style="margin-top:20px; width:300px;">
+						  <tr>
+							<td colspan="2" style="font-size:16px; color:#000000; font-weight:bold;">@lang('message.dashboard.left-table.details')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#000000;">@lang('message.dashboard.left-table.exchange-from.exchange-from-amount')</td>
+							<td style="font-size:15px; color:#4e5c6e; text-align:right;">{{ moneyFormat(optional($transaction->currency)->symbol, formatNumber($transaction->subtotal)) }}</td>
+						  </tr>
+
+						  	@if (abs($transaction->total) - abs($transaction->subtotal) > 0)
+								<tr style="padding-bottom:10px;">
+									<td style="font-size:15px; color:#000000;">@lang('message.dashboard.left-table.fee')</td>
+									<td style="font-size:15px; color:#4e5c6e; text-align:right;">{{ moneyFormat(optional($transaction->currency)->symbol, formatNumber($transaction->charge_percentage + $transaction->charge_fixed)) }}</td>
+								</tr>
+							@endif
+
+						  <tr>
+						    <td colspan="2" style="border-top:1px solid #eaeaea; padding-top:0; margin-bottom:3px;"></td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#000000; font-weight:bold;">@lang('message.dashboard.left-table.total')</td>
+							<td style="font-size:15px; color:#4e5c6e; text-align:right; font-weight:bold;">{{ moneyFormat(optional($transaction->currency)->symbol, formatNumber($transaction->subtotal + $transaction->charge_percentage + $transaction->charge_fixed)) }}</td>
+						  </tr>
+						  </table>
+					    </td>
+					  </tr>
+				</table>
+			@else
+				<table>
+					<tr>
+					  <td>
+					   <table>
+						  <tr>
+							<td style="font-size:16px; color:#000000; line-height:25px; font-weight:bold;">@lang('message.dashboard.left-table.exchange-to.to-wallet')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#4e5c6e; line-height:22px;">{{ $transaction->currency->code }}</td>
+						  </tr>
+						  </table>
+					  </td>
+					  </tr>
+
+					<tr>
+					  <td>
+					   <table style="margin-top:20px;">
+						  <tr>
+							<td style="font-size:16px; color:#000000; line-height:25px; font-weight:bold;">@lang('message.dashboard.left-table.transaction-id')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#4e5c6e; line-height:22px;">{{$transaction->uuid}}</td>
+						  </tr>
+						  <br><br>
+
+						  <tr>
+							<td style="font-size:16px; color:#000000; line-height:25px; font-weight:bold;">@lang('message.dashboard.left-table.transaction-date')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#4e5c6e; line-height:22px;">{{ dateFormat($transaction->created_at) }}</td>
+						  </tr>
+						  <br><br>
+
+						  <tr>
+							<td style="font-size:16px; color:#000000; line-height:25px; font-weight:bold;">@lang('message.form.status')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#4e5c6e; line-height:22px;">{{ (($transaction->status == 'Blocked') ? __("Cancelled") :(($transaction->status == 'Refund') ? __("Refunded"):
+								__($transaction->status))) }}</td>
+						  </tr>
+					   </table>
+					  </td>
+					  </tr>
+
+					<tr>
+					  <td>
+					   <table style="margin-top:20px; width:300px;">
+						  <tr>
+							<td colspan="2" style="font-size:16px; color:#000000; font-weight:bold;">@lang('message.dashboard.left-table.details')</td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#000000;">@lang('message.dashboard.left-table.exchange-from.exchange-from-amount')</td>
+							<td style="font-size:15px; color:#4e5c6e; text-align:right;">{{ moneyFormat(optional($transaction->currency)->symbol, formatNumber($transaction->subtotal)) }}</td>
+						  </tr>
+						  <tr>
+						    <td colspan="2" style="border-top:1px solid #eaeaea; padding-top:0; margin-bottom:3px;"></td>
+						  </tr>
+						  <tr>
+							<td style="font-size:15px; color:#000000; font-weight:bold;">@lang('message.dashboard.left-table.total')</td>
+							<td style="font-size:15px; color:#4e5c6e; text-align:right; font-weight:bold;">{{ moneyFormat(optional($transaction->currency)->symbol, formatNumber($transaction->subtotal)) }}</td>
+						  </tr>
+						  </table>
+					    </td>
+					  </tr>
+				</table>
+			@endif
+
+	    </div>
+	</body>
+</html>

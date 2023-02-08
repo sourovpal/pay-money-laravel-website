@@ -1,0 +1,40 @@
+{
+    "name": "techvill/theme",
+    "description": "Theme and asset management for laravel 7",
+    "keywords": ["theme", "child-theme", "multi", "theme", "asset", "management", "laravel", "lumen"],
+    "homepage": "https://github.com/sneherador",
+    "license": "CC-BY-3.0",
+    "authors": [
+        {
+            "name": "Md. Ahsanul Haque Millat",
+            "email": "millat.techvill@gmail.com"
+        }
+    ],
+    "require": {
+        "hassankhan/config": "^2.1",
+        "symfony/yaml": "5.1.x-dev"
+    },
+    "autoload": {
+        "psr-4": {
+            "TechVill\\Theme\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "TechVill\\Theme\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "TechVill\\Theme\\Providers\\ThemeServiceProvider"
+            ],
+            "aliases": {
+                "Theme": "TechVill\\Theme\\Facades\\Theme"
+            }
+        }
+    },
+    "suggest": {
+        "symfony/yaml": "Allows for parsing of YAML theme info and change log files"
+    }
+}
